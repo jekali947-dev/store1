@@ -178,62 +178,7 @@ export const placeholderStoreData: StoreData = {
     },
   ],
   products: [
-    // {products} - placeholder binding for Firebase
-    {
-      id: "p1",
-      name: "Gourmet Burger",
-      price: 8.99,
-      stock: 25,
-      category: "Fast Food",
-      unit: "item",
-      description: "Delicious gourmet burger with premium ingredients",
-      image: "/images/food-1.jpg",
-      available: true,
-    },
-    {
-      id: "p2",
-      name: "Fresh Salad",
-      price: 6.50,
-      stock: 40,
-      category: "Healthy",
-      unit: "item",
-      description: "Fresh garden salad with seasonal vegetables",
-      image: "/images/food-2.jpg",
-      available: true,
-    },
-    {
-      id: "p3",
-      name: "Chocolate Cake",
-      price: 4.50,
-      stock: 18,
-      category: "Desserts",
-      unit: "item",
-      description: "Rich chocolate cake with creamy frosting",
-      image: "/images/food-3.jpg",
-      available: true,
-    },
-    {
-      id: "p4",
-      name: "Sushi Platter",
-      price: 12.99,
-      stock: 12,
-      category: "Japanese",
-      unit: "item",
-      description: "Assorted sushi platter with fresh fish",
-      image: "/images/food-4.jpg",
-      available: true,
-    },
-    {
-      id: "p5",
-      name: "Organic Juice",
-      price: 3.00,
-      stock: 30,
-      category: "Beverages",
-      unit: "item",
-      description: "Freshly squeezed organic juice",
-      image: "/images/food-5.jpg",
-      available: true,
-    },
+    // {products} - placeholder binding for Firebase - populated from Firestore
   ],
   openingHours: [
     // {openingHours} - placeholder binding for Firebase
@@ -248,8 +193,8 @@ export const placeholderStoreData: StoreData = {
   storeInfo: {
     // {storeInfo} - placeholder binding for Firebase
     logo: "",
-    name: "My Electronics Shop",
-    address: "1234 Main Street, Suite 100, New York, NY 10001",
-    phone: "+1 (212) 555-1234",
+    name: "",
+    address: "",
+    phone: "",
   },
 }

@@ -114,7 +114,7 @@ export function ProductsPage({
                     {product.name}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    ${product.price.toFixed(2)} - In Stock: {product.stock}
+                    ZMW {product.price.toFixed(2)} - In Stock: {product.stock}
                   </p>
                   {!product.available && (
                     <span className="inline-block mt-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">

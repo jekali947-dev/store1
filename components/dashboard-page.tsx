@@ -34,10 +34,10 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
       <div 
         className="px-4 pt-5 pb-4 shrink-0 relative z-10"
         style={{
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          background: "rgba(255, 255, 255, 0.15)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.25)",
+          backdropFilter: "blur(3px)",
+          WebkitBackdropFilter: "blur(3px)",
+          background: "rgba(255, 255, 255, 0.08)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
         }}
       >
         {/* Store name + Revenue row */}
@@ -172,9 +172,9 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
         id="recentOrdersList" 
         className="flex-1 overflow-y-auto px-4 pb-2 scrollbar-hide relative z-10"
         style={{
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          background: "rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(3px)",
+          WebkitBackdropFilter: "blur(3px)",
+          background: "rgba(255, 255, 255, 0.08)",
         }}
       >
         <div className="flex flex-col gap-3 pt-3">

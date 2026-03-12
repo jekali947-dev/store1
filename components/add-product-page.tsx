@@ -241,13 +241,13 @@ export function AddProductPage({ product, storeId, storeName, storeAddress, onBa
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Price ($)
+                Price (ZMW)
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="$0.00"
+                placeholder="ZMW 0.00"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="w-full px-4 py-3 bg-card border border-border rounded-xl text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
