@@ -1,25 +1,35 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { ChevronLeft, Upload, MapPin, Phone } from "lucide-react"
+import { ChevronLeft, Upload, MapPin, Phone, Loader2 } from "lucide-react"
+import { doc, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { uploadStoreLogo } from "@/lib/cloudinary"
 import type { StoreInfo } from "@/lib/store-data"
 
 interface StoreInfoPageProps {
   storeInfo: StoreInfo
+  storeId: string
   onBack: () => void
   onSave: (info: StoreInfo) => void
 }
 
-export function StoreInfoPage({ storeInfo, onBack, onSave }: StoreInfoPageProps) {
+export function StoreInfoPage({ storeInfo, storeId, onBack, onSave }: StoreInfoPageProps) {
   const [logo, setLogo] = useState(storeInfo.logo || "")
   const [name, setName] = useState(storeInfo.name || "")
   const [address, setAddress] = useState(storeInfo.address || "")
   const [phone, setPhone] = useState(storeInfo.phone || "")
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setLogoFile(file)
+      // Show preview immediately
       const reader = new FileReader()
       reader.onload = (event) => {
         setLogo(event.target?.result as string)
@@ -28,13 +38,47 @@ export function StoreInfoPage({ storeInfo, onBack, onSave }: StoreInfoPageProps)
     }
   }
 
-  const handleSave = () => {
-    onSave({
-      logo,
-      name: name.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
-    })
+  const handleSave = async () => {
+    setError(null)
+    setIsSaving(true)
+
+    try {
+      let logoUrl = logo
+
+      // Upload logo to Cloudinary if a new file was selected
+      if (logoFile) {
+        setIsUploading(true)
+        try {
+          logoUrl = await uploadStoreLogo(logoFile, storeId)
+        } catch (uploadError) {
+          setError("Failed to upload logo. Please try again.")
+          setIsSaving(false)
+          setIsUploading(false)
+          return
+        }
+        setIsUploading(false)
+      }
+
+      // Save to Firestore
+      await setDoc(doc(db, "stores", storeId), {
+        logo: logoUrl,
+        storeName: name.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+      }, { merge: true })
+
+      onSave({
+        logo: logoUrl,
+        name: name.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+      })
+    } catch (err) {
+      console.error("Error saving store info:", err)
+      setError("Failed to save store information. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -58,12 +102,25 @@ export function StoreInfoPage({ storeInfo, onBack, onSave }: StoreInfoPageProps)
       {/* Scrollable Form Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide">
         <div className="flex flex-col gap-6">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/50 rounded-xl p-3 text-destructive text-sm text-center">
+              {error}
+            </div>
+          )}
+
           {/* Logo Upload */}
           <div className="flex flex-col items-center gap-3">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-36 h-36 border-2 border-dashed border-border rounded-full flex flex-col items-center justify-center gap-2 bg-card hover:bg-accent/50 transition-colors overflow-hidden"
+              disabled={isUploading || isSaving}
+              className="w-36 h-36 border-2 border-dashed border-border rounded-full flex flex-col items-center justify-center gap-2 bg-card hover:bg-accent/50 transition-colors overflow-hidden relative disabled:cursor-not-allowed"
             >
+              {isUploading && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                </div>
+              )}
               {logo ? (
                 <img
                   src={logo}
@@ -139,9 +196,17 @@ export function StoreInfoPage({ storeInfo, onBack, onSave }: StoreInfoPageProps)
           {/* Save Button */}
           <button
             onClick={handleSave}
-            className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold transition-all duration-200 active:scale-[0.98] hover:bg-primary/90 mt-4"
+            disabled={isSaving || isUploading}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold transition-all duration-200 active:scale-[0.98] hover:bg-primary/90 mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Save
+            {isSaving || isUploading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {isUploading ? "Uploading..." : "Saving..."}
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
         </div>
       </div>

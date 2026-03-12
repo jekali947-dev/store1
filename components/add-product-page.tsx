@@ -1,11 +1,17 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { ChevronLeft, Camera, Plus } from "lucide-react"
+import { ChevronLeft, Camera, Plus, Loader2 } from "lucide-react"
+import { doc, collection, setDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { uploadProductImage } from "@/lib/cloudinary"
 import type { Product } from "@/lib/store-data"
 
 interface AddProductPageProps {
   product?: Product | null
+  storeId: string
+  storeName: string
+  storeAddress: string
   onBack: () => void
   onSave: (product: Omit<Product, "id"> & { id?: string }) => void
 }
@@ -23,7 +29,7 @@ const categories = [
 
 const units = ["item", "bag", "g", "kg", "ml", "L", "pack"]
 
-export function AddProductPage({ product, onBack, onSave }: AddProductPageProps) {
+export function AddProductPage({ product, storeId, storeName, storeAddress, onBack, onSave }: AddProductPageProps) {
   const [name, setName] = useState(product?.name || "")
   const [category, setCategory] = useState(product?.category || "Fresh Produce")
   const [price, setPrice] = useState(product?.price?.toString() || "")
@@ -32,6 +38,10 @@ export function AddProductPage({ product, onBack, onSave }: AddProductPageProps)
   const [available, setAvailable] = useState(product?.available ?? true)
   const [image, setImage] = useState(product?.image || "")
   const [stock, setStock] = useState(product?.stock?.toString() || "0")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!product
@@ -39,6 +49,8 @@ export function AddProductPage({ product, onBack, onSave }: AddProductPageProps)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setImageFile(file)
+      // Show preview immediately
       const reader = new FileReader()
       reader.onload = (event) => {
         setImage(event.target?.result as string)
@@ -47,20 +59,69 @@ export function AddProductPage({ product, onBack, onSave }: AddProductPageProps)
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim() || !price) return
 
-    onSave({
-      ...(product?.id && { id: product.id }),
-      name: name.trim(),
-      category,
-      price: parseFloat(price) || 0,
-      unit,
-      description: description.trim(),
-      available,
-      image: image || "/images/placeholder.jpg",
-      stock: parseInt(stock) || 0,
-    })
+    setError(null)
+    setIsSaving(true)
+
+    try {
+      // Generate product ID using Firestore document reference
+      const productId = product?.id || doc(collection(db, "stores", storeId, "products")).id
+      
+      let imageUrl = image
+
+      // Upload image to Cloudinary if a new file was selected
+      if (imageFile) {
+        setIsUploading(true)
+        try {
+          imageUrl = await uploadProductImage(imageFile, storeId, productId)
+        } catch (uploadError) {
+          setError("Failed to upload image. Please try again.")
+          setIsSaving(false)
+          setIsUploading(false)
+          return
+        }
+        setIsUploading(false)
+      }
+
+      // Prepare product data for Firestore
+      const productData = {
+        name: name.trim(),
+        price: parseFloat(price) || 0,
+        imageUrl: imageUrl || "",
+        description: description.trim(),
+        category,
+        unit,
+        stockQuantity: parseInt(stock) || 0,
+        availability: available,
+        storeId,
+        storeName,
+        storeAddress,
+        createdAt: serverTimestamp(),
+      }
+
+      // Save to Firestore
+      await setDoc(doc(db, "stores", storeId, "products", productId), productData, { merge: true })
+
+      // Call onSave callback with the product data for local state update
+      onSave({
+        id: productId,
+        name: name.trim(),
+        category,
+        price: parseFloat(price) || 0,
+        unit,
+        description: description.trim(),
+        available,
+        image: imageUrl || "/images/placeholder.jpg",
+        stock: parseInt(stock) || 0,
+      })
+    } catch (err) {
+      console.error("Error saving product:", err)
+      setError("Failed to save product. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -92,12 +153,28 @@ export function AddProductPage({ product, onBack, onSave }: AddProductPageProps)
       {/* Scrollable Form Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-hide">
         <div className="flex flex-col gap-5">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/50 rounded-xl p-3 text-destructive text-sm text-center">
+              {error}
+            </div>
+          )}
+
           {/* Image Upload */}
           <div className="flex justify-center">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full max-w-xs h-36 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 bg-card hover:bg-accent/50 transition-colors"
+              disabled={isUploading || isSaving}
+              className="w-full max-w-xs h-36 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 bg-card hover:bg-accent/50 transition-colors relative overflow-hidden disabled:cursor-not-allowed"
             >
+              {isUploading && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                    <span className="text-xs text-muted-foreground">Uploading...</span>
+                  </div>
+                </div>
+              )}
               {image ? (
                 <img
                   src={image}
@@ -256,10 +333,17 @@ export function AddProductPage({ product, onBack, onSave }: AddProductPageProps)
           {/* Save Button */}
           <button
             onClick={handleSave}
-            disabled={!name.trim() || !price}
-            className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold transition-all duration-200 active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            disabled={!name.trim() || !price || isSaving || isUploading}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold transition-all duration-200 active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
           >
-            {isEditing ? "Update Product" : "Save Product"}
+            {isSaving || isUploading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {isUploading ? "Uploading Image..." : "Saving..."}
+              </>
+            ) : (
+              isEditing ? "Update Product" : "Save Product"
+            )}
           </button>
         </div>
       </div>

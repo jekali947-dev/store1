@@ -16,9 +16,16 @@ interface SignupPageProps {
     phone: string
     email: string
     address: string
+    category: string
   }) => void
   onSignIn: () => void
 }
+
+const storeCategories = [
+  { value: "food", label: "Food" },
+  { value: "clothes", label: "Clothes" },
+  { value: "hardware", label: "Hardware" },
+]
 
 export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
   const [step, setStep] = useState<1 | 2>(1)
@@ -35,6 +42,7 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
   const [firstName, setFirstName] = useState("")
   const [surname, setSurname] = useState("")
   const [storeName, setStoreName] = useState("")
+  const [category, setCategory] = useState("")
   const [address, setAddress] = useState("")
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([])
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
@@ -89,14 +97,18 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
       setError("Store name must be at least 3 characters")
       return false
     }
+    if (!category) {
+      setError("Please select a store category")
+      return false
+    }
     if (!address) {
       setError("Please enter a store address")
       return false
     }
     return true
-  }, [firstName, surname, storeName, address])
+  }, [firstName, surname, storeName, category, address])
 
-  const isStep2Valid = firstName.length >= 3 && surname.length >= 3 && storeName.length >= 3 && address.length > 0
+  const isStep2Valid = firstName.length >= 3 && surname.length >= 3 && storeName.length >= 3 && category.length > 0 && address.length > 0
 
   const handleContinue = useCallback(() => {
     setError(null)
@@ -143,6 +155,7 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
         firstName,
         surname,
         storeName,
+        category,
         phone: `+26${phone}`,
         email,
         address,
@@ -151,7 +164,15 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
         createdAt: serverTimestamp(),
         // Future fields ready for expansion
         logo: "",
-        openingHours: [],
+        openingHours: {
+          monday: { open: "", close: "" },
+          tuesday: { open: "", close: "" },
+          wednesday: { open: "", close: "" },
+          thursday: { open: "", close: "" },
+          friday: { open: "", close: "" },
+          saturday: { open: "", close: "" },
+          sunday: { open: "", close: "" },
+        },
         products: [],
         businessLicense: "",
         bankAccount: "",
@@ -166,6 +187,7 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
         phone: `+26${phone}`,
         email,
         address,
+        category,
       })
     } catch (err) {
       if (err instanceof Error) {
@@ -182,7 +204,7 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [email, password, firstName, surname, storeName, phone, address, validateStep2, onSignupSuccess])
+  }, [email, password, firstName, surname, storeName, category, phone, address, validateStep2, onSignupSuccess])
 
   return (
     <div className="relative min-h-dvh w-full overflow-hidden">
@@ -403,6 +425,34 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
                   onChange={(e) => setStoreName(e.target.value)}
                   className="w-full bg-transparent text-white placeholder:text-white/50 outline-none text-sm mt-1"
                 />
+              </div>
+
+              {/* Store Category Field */}
+              <div
+                className="rounded-xl px-4 py-2"
+                style={{
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "1px solid rgba(255, 255, 255, 0.3)",
+                }}
+              >
+                <label className="text-white/90 text-sm font-medium">Store Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-transparent text-white outline-none text-sm mt-1 appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 0 center",
+                  }}
+                >
+                  <option value="" disabled className="text-gray-800">Select a category</option>
+                  {storeCategories.map((cat) => (
+                    <option key={cat.value} value={cat.value} className="text-gray-800">
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Store Address Field with Autocomplete */}

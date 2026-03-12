@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { onAuthStateChanged, signOut, type User } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { WelcomePage } from "@/components/welcome-page"
 import { LoginPage } from "@/components/login-page"
@@ -29,6 +29,7 @@ export default function MerchantApp() {
   const [storeData, setStoreData] = useState<StoreData>(placeholderStoreData)
   const [direction, setDirection] = useState<"left" | "right">("right")
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const pageOrder = ["dashboard", "orders", "notifications", "settings"]
 
@@ -38,6 +39,42 @@ export default function MerchantApp() {
       const storeDoc = await getDoc(doc(db, "stores", uid))
       if (storeDoc.exists()) {
         const data = storeDoc.data()
+        
+        // Fetch products from subcollection
+        const productsSnapshot = await getDocs(collection(db, "stores", uid, "products"))
+        const productsFromFirestore: Product[] = productsSnapshot.docs.map((doc) => {
+          const productData = doc.data()
+          return {
+            id: doc.id,
+            name: productData.name || "",
+            price: productData.price || 0,
+            stock: productData.stockQuantity || 0,
+            category: productData.category || "",
+            unit: productData.unit || "item",
+            description: productData.description || "",
+            image: productData.imageUrl || "/images/placeholder.jpg",
+            available: productData.availability ?? true,
+          }
+        })
+
+        // Convert opening hours from object to array format if needed
+        let openingHoursArray = placeholderStoreData.openingHours
+        if (data.openingHours && typeof data.openingHours === "object" && !Array.isArray(data.openingHours)) {
+          const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+          openingHoursArray = days.map((day) => {
+            const dayKey = day.toLowerCase()
+            const hourData = data.openingHours[dayKey]
+            return {
+              day,
+              isOpen: hourData?.open && hourData?.close ? true : false,
+              openTime: hourData?.open || "09:00",
+              closeTime: hourData?.close || "17:00",
+            }
+          })
+        } else if (Array.isArray(data.openingHours) && data.openingHours.length > 0) {
+          openingHoursArray = data.openingHours
+        }
+
         setStoreData((prev) => ({
           ...prev,
           storeName: data.storeName || prev.storeName,
@@ -48,9 +85,8 @@ export default function MerchantApp() {
             phone: data.phone || prev.storeInfo.phone,
             logo: data.logo || prev.storeInfo.logo,
           },
-          // Load any other stored fields
-          openingHours: data.openingHours?.length > 0 ? data.openingHours : prev.openingHours,
-          products: data.products?.length > 0 ? data.products : prev.products,
+          openingHours: openingHoursArray,
+          products: productsFromFirestore.length > 0 ? productsFromFirestore : prev.products,
         }))
       }
     } catch (error) {
@@ -63,11 +99,13 @@ export default function MerchantApp() {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
       if (user) {
         // User is logged in - fetch their store data from Firestore
+        setCurrentUserId(user.uid)
         await fetchStoreData(user.uid)
         setIsAuthenticated(true)
         setAuthPage("welcome")
       } else {
         // User is not logged in
+        setCurrentUserId(null)
         setIsAuthenticated(false)
         setAuthPage("welcome")
         // Reset store data to placeholder
@@ -88,8 +126,10 @@ export default function MerchantApp() {
     phone: string
     email: string
     address: string
+    category: string
   }) => {
     // Update store data with user's info
+    setCurrentUserId(userData.uid)
     setStoreData((prev) => ({
       ...prev,
       storeName: userData.storeName,
@@ -348,32 +388,38 @@ export default function MerchantApp() {
               onNavigate={handleSettingsNavigate}
             />
           )}
-          {activePage === "products" && (
+          {activePage === "products" && currentUserId && (
             <ProductsPage
               products={storeData.products}
+              storeId={currentUserId}
               onBack={handleBack}
               onEditProduct={handleEditProduct}
               onDeleteProduct={handleDeleteProduct}
               onToggleAvailability={handleToggleProductAvailability}
             />
           )}
-          {activePage === "addProduct" && (
+          {activePage === "addProduct" && currentUserId && (
             <AddProductPage
               product={editingProduct}
+              storeId={currentUserId}
+              storeName={storeData.storeName}
+              storeAddress={storeData.storeInfo.address}
               onBack={handleBack}
               onSave={handleSaveProduct}
             />
           )}
-          {activePage === "openingHours" && (
+          {activePage === "openingHours" && currentUserId && (
             <OpeningHoursPage
               openingHours={storeData.openingHours}
+              storeId={currentUserId}
               onBack={handleBack}
               onSave={handleSaveOpeningHours}
             />
           )}
-          {activePage === "storeInfo" && (
+          {activePage === "storeInfo" && currentUserId && (
             <StoreInfoPage
               storeInfo={storeData.storeInfo}
+              storeId={currentUserId}
               onBack={handleBack}
               onSave={handleSaveStoreInfo}
             />

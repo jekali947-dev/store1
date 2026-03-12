@@ -1,11 +1,14 @@
 "use client"
 
-import { ChevronLeft, Search, Pencil, Trash2 } from "lucide-react"
+import { ChevronLeft, Search, Pencil, Trash2, Loader2 } from "lucide-react"
+import { doc, deleteDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/store-data"
 import { useState } from "react"
 
 interface ProductsPageProps {
   products: Product[]
+  storeId: string
   onBack: () => void
   onEditProduct: (product: Product) => void
   onDeleteProduct: (productId: string) => void
@@ -14,16 +17,35 @@ interface ProductsPageProps {
 
 export function ProductsPage({
   products,
+  storeId,
   onBack,
   onEditProduct,
   onDeleteProduct,
   onToggleAvailability,
 }: ProductsPageProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const handleDelete = async (productId: string) => {
+    if (deletingId) return // Prevent multiple deletions
+
+    setDeletingId(productId)
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, "stores", storeId, "products", productId))
+      // Update local state
+      onDeleteProduct(productId)
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      alert("Failed to delete product. Please try again.")
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -112,11 +134,16 @@ export function ProductsPage({
                     Edit
                   </button>
                   <button
-                    onClick={() => onDeleteProduct(product.id)}
-                    className="flex items-center justify-center bg-destructive text-destructive-foreground p-2 rounded-lg transition-all duration-200 active:scale-95 hover:bg-destructive/90"
+                    onClick={() => handleDelete(product.id)}
+                    disabled={deletingId === product.id}
+                    className="flex items-center justify-center bg-destructive text-destructive-foreground p-2 rounded-lg transition-all duration-200 active:scale-95 hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label={`Delete ${product.name}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {deletingId === product.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>

@@ -1,11 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronLeft, ChevronUp, ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronUp, ChevronDown, Loader2 } from "lucide-react"
+import { doc, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import type { OpeningHour } from "@/lib/store-data"
 
 interface OpeningHoursPageProps {
   openingHours: OpeningHour[]
+  storeId: string
   onBack: () => void
   onSave: (hours: OpeningHour[]) => void
 }
@@ -106,8 +109,10 @@ function TimePickerInput({
   )
 }
 
-export function OpeningHoursPage({ openingHours, onBack, onSave }: OpeningHoursPageProps) {
+export function OpeningHoursPage({ openingHours, storeId, onBack, onSave }: OpeningHoursPageProps) {
   const [hours, setHours] = useState<OpeningHour[]>(openingHours)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const updateHour = (index: number, updates: Partial<OpeningHour>) => {
     setHours((prev) =>
@@ -115,8 +120,34 @@ export function OpeningHoursPage({ openingHours, onBack, onSave }: OpeningHoursP
     )
   }
 
-  const handleSave = () => {
-    onSave(hours)
+  const handleSave = async () => {
+    setError(null)
+    setIsSaving(true)
+
+    try {
+      // Convert hours array to the Firestore object structure
+      const openingHoursData: Record<string, { open: string; close: string }> = {}
+      
+      hours.forEach((hour) => {
+        const dayKey = hour.day.toLowerCase()
+        openingHoursData[dayKey] = {
+          open: hour.isOpen ? hour.openTime : "",
+          close: hour.isOpen ? hour.closeTime : "",
+        }
+      })
+
+      // Save to Firestore using merge to not overwrite other data
+      await setDoc(doc(db, "stores", storeId), {
+        openingHours: openingHoursData,
+      }, { merge: true })
+
+      onSave(hours)
+    } catch (err) {
+      console.error("Error saving opening hours:", err)
+      setError("Failed to save opening hours. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -136,9 +167,17 @@ export function OpeningHoursPage({ openingHours, onBack, onSave }: OpeningHoursP
           </div>
           <button
             onClick={handleSave}
-            className="text-sm font-semibold text-primary transition-colors hover:text-primary/80"
+            disabled={isSaving}
+            className="text-sm font-semibold text-primary transition-colors hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
           >
-            Save
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
         </div>
         <p className="text-sm text-muted-foreground mt-2 ml-9">
@@ -149,6 +188,13 @@ export function OpeningHoursPage({ openingHours, onBack, onSave }: OpeningHoursP
       {/* Scrollable Hours List */}
       <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-hide">
         <div className="flex flex-col gap-3">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/50 rounded-xl p-3 text-destructive text-sm text-center">
+              {error}
+            </div>
+          )}
+
           {hours.map((hour, index) => (
             <div
               key={hour.day}
