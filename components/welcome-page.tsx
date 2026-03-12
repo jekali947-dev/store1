@@ -1,5 +1,7 @@
 "use client"
 
+import { WaterDroplets } from "@/components/water-droplets"
+
 interface WelcomePageProps {
   onSignIn: () => void
   onSignUp: () => void
@@ -17,6 +19,9 @@ export function WelcomePage({ onSignIn, onSignUp }: WelcomePageProps) {
           backgroundPosition: "center",
         }}
       />
+
+      {/* Water Droplets Animation Layer */}
+      <WaterDroplets />
 
       {/* Content Container */}
       <div className="relative z-10 min-h-dvh flex items-center justify-center p-4">

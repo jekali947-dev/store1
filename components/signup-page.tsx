@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { searchAddress, type AddressSuggestion } from "@/lib/address-service"
+import { WaterDroplets } from "@/components/water-droplets"
 
 interface SignupPageProps {
   onSignupSuccess: (userData: {
@@ -220,13 +221,8 @@ export function SignupPage({ onSignupSuccess, onSignIn }: SignupPageProps) {
         }}
       />
 
-      {/* Water Droplets Overlay */}
-      <div className="absolute inset-0 z-[1] pointer-events-none opacity-30"
-        style={{
-          backgroundImage: "url('/images/water-droplets.png')",
-          backgroundSize: "cover",
-        }}
-      />
+      {/* Water Droplets Animation Layer */}
+      <WaterDroplets />
 
       {/* Content Container */}
       <div className="relative z-10 min-h-dvh flex items-center justify-center p-4">

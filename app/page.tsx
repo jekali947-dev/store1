@@ -42,10 +42,10 @@ export default function MerchantApp() {
         
         // Fetch products from subcollection
         const productsSnapshot = await getDocs(collection(db, "stores", uid, "products"))
-        const productsFromFirestore: Product[] = productsSnapshot.docs.map((doc) => {
-          const productData = doc.data()
+        const productsFromFirestore: Product[] = productsSnapshot.docs.map((docSnap) => {
+          const productData = docSnap.data()
           return {
-            id: doc.id,
+            id: docSnap.id,
             name: productData.name || "",
             price: productData.price || 0,
             stock: productData.stockQuantity || 0,
@@ -75,19 +75,21 @@ export default function MerchantApp() {
           openingHoursArray = data.openingHours
         }
 
-        setStoreData((prev) => ({
-          ...prev,
-          storeName: data.storeName || prev.storeName,
+        // Set store data from Firestore - Firestore is the source of truth
+        setStoreData({
+          ...placeholderStoreData,
+          storeName: data.storeName || placeholderStoreData.storeName,
           storeInfo: {
-            ...prev.storeInfo,
-            name: data.storeName || prev.storeInfo.name,
-            address: data.address || prev.storeInfo.address,
-            phone: data.phone || prev.storeInfo.phone,
-            logo: data.logo || prev.storeInfo.logo,
+            name: data.storeName || "",
+            address: data.address || "",
+            phone: data.phone || "",
+            logo: data.logo || "",
           },
           openingHours: openingHoursArray,
-          products: productsFromFirestore.length > 0 ? productsFromFirestore : prev.products,
-        }))
+          products: productsFromFirestore, // Always use Firestore products (empty array is valid)
+          storeStatus: placeholderStoreData.storeStatus,
+          storeStatusManualOverride: false,
+        })
       }
     } catch (error) {
       console.error("Error fetching store data:", error)
@@ -254,23 +256,25 @@ export default function MerchantApp() {
   const handleSaveProduct = useCallback(
     (product: Omit<Product, "id"> & { id?: string }) => {
       if (product.id) {
-        // Update existing product
-        setStoreData((prev) => ({
-          ...prev,
-          products: prev.products.map((p) =>
-            p.id === product.id ? { ...p, ...product } as Product : p
-          ),
-        }))
-      } else {
-        // Add new product
-        const newProduct: Product = {
-          ...product,
-          id: `p${Date.now()}`,
-        }
-        setStoreData((prev) => ({
-          ...prev,
-          products: [...prev.products, newProduct],
-        }))
+        // Check if product exists - update or add
+        setStoreData((prev) => {
+          const existingIndex = prev.products.findIndex((p) => p.id === product.id)
+          if (existingIndex !== -1) {
+            // Update existing product
+            return {
+              ...prev,
+              products: prev.products.map((p) =>
+                p.id === product.id ? { ...p, ...product } as Product : p
+              ),
+            }
+          } else {
+            // Add new product with provided ID (from Firestore)
+            return {
+              ...prev,
+              products: [...prev.products, product as Product],
+            }
+          }
+        })
       }
       setEditingProduct(null)
       setActivePage("products")

@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { Mail, Lock, Bike } from "lucide-react"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { WaterDroplets } from "@/components/water-droplets"
 
 interface LoginPageProps {
   onLoginSuccess: () => void
@@ -63,8 +64,8 @@ export function LoginPage({ onLoginSuccess, onSignUp }: LoginPageProps) {
         }}
       />
 
-      {/* Dark overlay for contrast */}
-      <div className="absolute inset-0 z-[1] bg-black/30" />
+      {/* Water Droplets Animation Layer */}
+      <WaterDroplets />
 
       {/* Content Container */}
       <div className="relative z-10 min-h-dvh flex items-center justify-center p-4">
