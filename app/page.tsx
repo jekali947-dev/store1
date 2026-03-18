@@ -33,8 +33,11 @@ export default function MerchantApp() {
 
   const pageOrder = ["dashboard", "orders", "notifications", "settings"]
 
-  // Fetch store data from Firestore
-  const fetchStoreData = useCallback(async (uid: string) => {
+  // Fetch store data from Firestore with retry logic
+  const fetchStoreData = useCallback(async (uid: string, retryCount = 0) => {
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 2000
+
     try {
       const storeDoc = await getDoc(doc(db, "stores", uid))
       if (storeDoc.exists()) {
@@ -91,8 +94,23 @@ export default function MerchantApp() {
           storeStatusManualOverride: false,
         })
       }
-    } catch (error) {
-      console.error("Error fetching store data:", error)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error("Error fetching store data:", errorMessage)
+      
+      // Retry on offline/network errors
+      if (retryCount < MAX_RETRIES && (
+        errorMessage.includes("offline") || 
+        errorMessage.includes("network") ||
+        errorMessage.includes("Failed to get document")
+      )) {
+        console.log(`Retrying fetch in ${RETRY_DELAY}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        return fetchStoreData(uid, retryCount + 1)
+      }
+      
+      // If all retries failed, still allow the user to continue with placeholder data
+      // They can refresh to retry later
     }
   }, [])
 
