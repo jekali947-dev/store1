@@ -1,19 +1,87 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Star, TrendingUp } from "lucide-react"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { WaterDroplets } from "@/components/water-droplets"
 import type { StoreData } from "@/lib/store-data"
+import type { FirestoreOrder } from "@/components/order-popup-panel"
 
 interface DashboardPageProps {
   data: StoreData & { storeInfo?: { logo?: string } }
+  realtimeOrders: FirestoreOrder[]
+  pendingCount: number
+  acceptedCount: number
   onToggleStatus: () => void
   onNavigate: (page: string) => void
 }
 
-export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPageProps) {
-  const recentOrders = data.recentOrders.slice(0, 5)
-
+export function DashboardPage({ 
+  data, 
+  realtimeOrders, 
+  pendingCount, 
+  acceptedCount, 
+  onToggleStatus, 
+  onNavigate 
+}: DashboardPageProps) {
+  const [storeRating, setStoreRating] = useState(0)
+  const [reviewCount, setReviewCount] = useState(0)
+  
   const logoUrl = data.storeInfo?.logo
+
+  // Subscribe to store rating and review count
+  useEffect(() => {
+    // Get the storeId from data or use a default approach
+    // For now, we'll use the rating from the store document
+    // This would need the storeId passed as a prop in production
+  }, [])
+
+  // Calculate today's metrics from real-time orders
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const todayOrders = realtimeOrders.filter(order => {
+    const orderDate = new Date(order.createdAt)
+    orderDate.setHours(0, 0, 0, 0)
+    return orderDate.getTime() === today.getTime()
+  })
+
+  const ordersToday = todayOrders.length
+  const completedOrders = todayOrders.filter(o => o.status === "ready_for_pickup").length
+  const pendingOrdersCount = todayOrders.filter(o => o.status === "pending").length
+  
+  // Calculate today's revenue from completed orders
+  const revenueToday = todayOrders
+    .filter(o => o.status === "ready_for_pickup" || o.status === "accepted")
+    .reduce((sum, o) => sum + o.total, 0)
+
+  // Calculate weekly revenue (last 7 days)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
+  
+  const weeklyRevenue = realtimeOrders
+    .filter(o => {
+      const orderDate = new Date(o.createdAt)
+      return orderDate >= sevenDaysAgo && (o.status === "ready_for_pickup" || o.status === "accepted")
+    })
+    .reduce((sum, o) => sum + o.total, 0)
+
+  // Get recent orders for display (max 5)
+  const recentOrders = todayOrders.slice(0, 5)
+
+  // Format time
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+  }
+
+  // Map status for display
+  const getDisplayStatus = (status: string): "pending" | "accepted" | "completed" => {
+    if (status === "ready_for_pickup") return "completed"
+    if (status === "accepted") return "accepted"
+    return "pending"
+  }
 
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
@@ -43,7 +111,7 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
         {/* Store name + Revenue row */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white drop-shadow-lg">{data.storeName}</h1>
+            <h1 className="text-xl font-bold text-white drop-shadow-lg">{data.storeName || "Your Store"}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-white/80">Store Status</span>
             </div>
@@ -79,10 +147,10 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
             }}
           >
             <p className="text-xs text-white/80">Store Revenue Today</p>
-            <p className="text-xl font-bold text-white">ZMW {data.revenueToday.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+            <p className="text-xl font-bold text-white">ZMW {revenueToday.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
             <div className="flex items-center justify-end gap-1 text-[#22c55e]">
               <TrendingUp className="w-3 h-3" />
-              <span className="text-xs font-medium">+12%</span>
+              <span className="text-xs font-medium">Live</span>
             </div>
           </div>
         </div>
@@ -100,9 +168,9 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
             }}
           >
             <p className="text-xs text-white/80">Orders Today</p>
-            <p className="text-2xl font-bold text-white mt-1">{data.ordersToday}</p>
+            <p className="text-2xl font-bold text-white mt-1">{ordersToday}</p>
             <p className="text-[10px] text-white/60 mt-0.5">
-              {data.completedOrders} Completed / {data.pendingOrders} Pending
+              {completedOrders} Completed / {pendingOrdersCount} Pending
             </p>
           </div>
           <div 
@@ -116,7 +184,7 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
             }}
           >
             <p className="text-xs text-white/80">Pending Orders</p>
-            <p className="text-2xl font-bold text-[#f97316] mt-1">{data.pendingOrders}</p>
+            <p className="text-2xl font-bold text-[#f97316] mt-1">{pendingCount}</p>
             <p className="text-[10px] text-white/60 mt-0.5">Action Needed</p>
           </div>
           <div 
@@ -131,7 +199,7 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
           >
             <p className="text-xs text-white/80">Total Revenue</p>
             <p className="text-xl font-bold text-[#22c55e] mt-1">
-              ZMW {data.weeklyRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ZMW {weeklyRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-white/60 mt-0.5">This Week</p>
           </div>
@@ -147,10 +215,10 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
           >
             <p className="text-xs text-white/80">Customer Rating</p>
             <div className="flex items-center gap-1 mt-1">
-              <span className="text-2xl font-bold text-white">{data.customerRating}</span>
+              <span className="text-2xl font-bold text-white">{data.customerRating || 0}</span>
               <Star className="w-5 h-5 fill-[#eab308] text-[#eab308]" />
             </div>
-            <p className="text-[10px] text-white/60 mt-0.5">{data.totalReviews} Reviews</p>
+            <p className="text-[10px] text-white/60 mt-0.5">{data.totalReviews || 0} Reviews</p>
           </div>
         </div>
 
@@ -178,33 +246,38 @@ export function DashboardPage({ data, onToggleStatus, onNavigate }: DashboardPag
         }}
       >
         <div className="flex flex-col gap-3 pt-3">
-          {recentOrders.map((order) => (
-            <div
-              key={order.id}
-              className="rounded-xl p-3 flex items-center gap-3 transition-all duration-200 active:scale-[0.98]"
-              style={{
-                background: "rgba(255, 255, 255, 0.2)",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-              }}
-            >
-              <img
-                src={order.image}
-                alt={`Order ${order.id}`}
-                className="w-12 h-12 rounded-lg object-cover shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">{order.id}</p>
-                <p className="text-xs text-white/70">{order.customerName}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-white">
-                  ZMW {order.price.toFixed(2)}
-                </p>
-                <p className="text-xs text-white/70">{order.time}</p>
-              </div>
-              <StatusBadge status={order.status} />
+          {recentOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-white/70 text-sm">No orders yet today</p>
+              <p className="text-white/50 text-xs mt-1">Orders will appear here when received</p>
             </div>
-          ))}
+          ) : (
+            recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="rounded-xl p-3 flex items-center gap-3 transition-all duration-200 active:scale-[0.98]"
+                style={{
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                }}
+              >
+                <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                  <span className="text-primary font-bold text-xs">#{order.orderId.slice(-3)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white">{order.userName}</p>
+                  <p className="text-xs text-white/70">{order.items.length} item(s)</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-white">
+                    ZMW {order.total.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-white/70">{formatTime(order.createdAt)}</p>
+                </div>
+                <StatusBadge status={getDisplayStatus(order.status)} />
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -16,6 +16,8 @@ import { AddProductPage } from "@/components/add-product-page"
 import { OpeningHoursPage } from "@/components/opening-hours-page"
 import { StoreInfoPage } from "@/components/store-info-page"
 import { BottomNavigation } from "@/components/bottom-navigation"
+import { OrderPopupPanel } from "@/components/order-popup-panel"
+import { useRealtimeOrders } from "@/hooks/use-realtime-orders"
 import { placeholderStoreData } from "@/lib/store-data"
 import type { StoreData, Product, OpeningHour, StoreInfo } from "@/lib/store-data"
 
@@ -30,6 +32,17 @@ export default function MerchantApp() {
   const [direction, setDirection] = useState<"left" | "right">("right")
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  // Real-time orders from Firestore
+  const {
+    pendingOrders,
+    acceptedOrders,
+    allOrders,
+    todayOrders,
+    pendingOrderForPopup,
+    dismissPopup,
+    handleStatusUpdate,
+  } = useRealtimeOrders(currentUserId)
 
   const pageOrder = ["dashboard", "orders", "notifications", "settings"]
 
@@ -379,6 +392,14 @@ export default function MerchantApp() {
   // Show main dashboard app
   return (
     <div className="flex flex-col h-dvh w-full max-w-[1200px] mx-auto bg-background">
+      {/* Global Order Popup Panel */}
+      {pendingOrderForPopup && (
+        <OrderPopupPanel
+          order={pendingOrderForPopup}
+          onClose={dismissPopup}
+          onStatusUpdate={handleStatusUpdate}
+        />
+      )}
       {/* Page Content */}
       <div className="flex-1 overflow-hidden relative">
         <div
@@ -393,14 +414,23 @@ export default function MerchantApp() {
           {activePage === "dashboard" && (
             <DashboardPage
               data={storeData}
+              realtimeOrders={allOrders}
+              pendingCount={pendingOrders.length}
+              acceptedCount={acceptedOrders.length}
               onToggleStatus={handleToggleStatus}
               onNavigate={handleNavigate}
             />
           )}
-          {activePage === "orders" && <OrdersPage orders={storeData.recentOrders} />}
+          {activePage === "orders" && (
+            <OrdersPage 
+              storeId={currentUserId}
+              realtimeOrders={allOrders}
+            />
+          )}
           {activePage === "notifications" && (
             <NotificationsPage
-              notifications={storeData.notifications}
+              storeId={currentUserId}
+              pendingOrders={pendingOrders}
               onMarkAllRead={handleMarkAllRead}
             />
           )}
