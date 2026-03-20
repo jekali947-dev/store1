@@ -26,7 +26,6 @@ export function useRealtimeOrders(storeId: string | null): UseRealtimeOrdersRetu
   const [error, setError] = useState<string | null>(null)
   const [pendingOrderForPopup, setPendingOrderForPopup] = useState<FirestoreOrder | null>(null)
   const [dismissedOrderIds, setDismissedOrderIds] = useState<Set<string>>(new Set())
-  const [previousPendingIds, setPreviousPendingIds] = useState<Set<string>>(new Set())
 
   // Convert Firestore timestamp to Date
   const convertTimestamp = (timestamp: unknown): Date => {
@@ -103,6 +102,8 @@ export function useRealtimeOrders(storeId: string | null): UseRealtimeOrdersRetu
       return
     }
 
+    console.log("[v0] Listening for storeId:", storeId)
+
     setIsLoading(true)
     setError(null)
 
@@ -118,6 +119,8 @@ export function useRealtimeOrders(storeId: string | null): UseRealtimeOrdersRetu
     const unsubscribe = onSnapshot(
       ordersQuery,
       (snapshot) => {
+        console.log("[v0] Snapshot received, docs count:", snapshot.docs.length)
+        
         const orders: FirestoreOrder[] = snapshot.docs.map((doc) => {
           const data = doc.data()
           return {
@@ -138,32 +141,41 @@ export function useRealtimeOrders(storeId: string | null): UseRealtimeOrdersRetu
         const pending = orders.filter(o => o.status === "pending")
         const accepted = orders.filter(o => o.status === "accepted")
         
-        // Check for new pending orders (not previously seen and not dismissed)
-        const currentPendingIds = new Set(pending.map(o => o.id))
-        const newPendingOrders = pending.filter(
-          o => !previousPendingIds.has(o.id) && !dismissedOrderIds.has(o.id)
-        )
+        console.log("[v0] Pending orders:", pending.length, "Accepted orders:", accepted.length)
         
-        // Show popup for the newest pending order
-        if (newPendingOrders.length > 0 && !pendingOrderForPopup) {
-          setPendingOrderForPopup(newPendingOrders[0])
-        }
-        
-        setPreviousPendingIds(currentPendingIds)
+        // Update state
         setPendingOrders(pending)
         setAcceptedOrders(accepted)
         setAllOrders(orders)
         setIsLoading(false)
       },
       (err) => {
-        console.error("Error listening to orders:", err)
+        console.error("[v0] Error listening to orders:", err)
         setError(err.message)
         setIsLoading(false)
       }
     )
 
     return () => unsubscribe()
-  }, [storeId, dismissedOrderIds, pendingOrderForPopup, previousPendingIds])
+  }, [storeId])
+
+  // Separate effect to handle popup triggering based on pending orders
+  // This runs whenever pendingOrders changes and checks if we should show a popup
+  useEffect(() => {
+    // Find the first pending order that hasn't been dismissed
+    const nextOrder = pendingOrders.find(o => !dismissedOrderIds.has(o.id))
+    
+    console.log("[v0] Checking for popup - pendingOrders:", pendingOrders.length, 
+      "dismissedIds:", dismissedOrderIds.size, 
+      "currentPopup:", pendingOrderForPopup?.id || "none",
+      "nextOrder:", nextOrder?.id || "none")
+    
+    // If there's a pending order that's not dismissed and we're not showing any popup
+    if (nextOrder && !pendingOrderForPopup) {
+      console.log("[v0] Showing popup for order:", nextOrder.id)
+      setPendingOrderForPopup(nextOrder)
+    }
+  }, [pendingOrders, dismissedOrderIds, pendingOrderForPopup])
 
   // Compute derived values
   const todayOrders = getTodayOrders(allOrders)
